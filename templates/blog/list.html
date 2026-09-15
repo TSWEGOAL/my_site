@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ '博客 · ' + active_tag if active_tag else '博客' }} - 孔亿欺的小站{% endblock %}
+{% block description %}孔亿欺的博客文章列表{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📝 博客{% if active_tag %} · #{{ active_tag }}{% endif %}</h1>
+    {% if is_admin %}
+    <a class="btn" href="/blog/admin/new">+ 写文章</a>
+    {% endif %}
+</div>
+
+{% if active_tag %}
+<div class="active-filter">
+    当前过滤标签：<strong>#{{ active_tag }}</strong>
+    <a href="/blog/" class="clear-filter">✕ 清除</a>
+</div>
+{% endif %}
+
+{% if tags %}
+<div class="tag-cloud tag-cloud-bar">
+    {% for tag, count in tags.items() %}
+    <a class="tag-pill {% if tag == active_tag %}active{% endif %}"
+       href="/blog/?tag={{ tag }}">
+        {{ tag }} <span class="tag-count">{{ count }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if posts %}
+<ul class="post-list">
+    {% for post in posts %}
+    <li>
+        <div class="post-info">
+            <a href="/blog/{{ post.id }}">{{ post.title }}</a>
+            {% if post.tags %}
+            <span class="tag-row">
+                {% for t in post.tags %}
+                <a class="tag-pill tag-sm" href="/blog/?tag={{ t }}">{{ t }}</a>
+                {% endfor %}
+            </span>
+            {% endif %}
+        </div>
+        <span class="date">{{ post.created_at.strftime('%Y-%m-%d') }}</span>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="empty-tip">
+    {% if active_tag %}标签 #{{ active_tag }} 还没有文章。{% else %}还没有文章。{% endif %}
+</p>
+{% endif %}
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('blog.list_posts', page=pagination.prev_num, **({'tag': active_tag} if active_tag else {})) }}">← 上一页</a>
+    {% else %}
+    <span class="disabled">← 上一页</span>
+    {% endif %}
+
+    <span class="page-info">第 {{ pagination.page }} / {{ pagination.pages }} 页</span>
+
+    {% if pagination.has_next %}
+    <a href="{{ url_for('blog.list_posts', page=pagination.next_num, **({'tag': active_tag} if active_tag else {})) }}">下一页 →</a>
+    {% else %}
+    <span class="disabled">下一页 →</span>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

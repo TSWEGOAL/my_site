@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}首页 - 孔亿欺的小站{% endblock %}
+{% block description %}孔亿欺的个人主页 — 学习笔记、小游戏、个人项目作品集{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>欢迎来到<span class="accent"> 孔亿欺</span>的小站</h1>
+    <p>记点学习笔记 · 玩点 HTML 小游戏</p>
+</section>
+
+<div class="home-grid">
+    <section class="home-section">
+        <div class="section-header">
+            <h2>📝 最新文章</h2>
+            <a href="/blog/" class="more-link">全部 →</a>
+        </div>
+        {% if recent_posts %}
+        <ul class="recent-posts">
+            {% for p in recent_posts %}
+            <li>
+                <a href="/blog/{{ p.id }}" class="recent-title">{{ p.title }}</a>
+                <span class="date">{{ p.created_at.strftime('%Y-%m-%d') }}</span>
+                {% if p.tags %}
+                <span class="tag-row">
+                    {% for t in p.tags %}
+                    <a class="tag-pill tag-sm" href="/blog/?tag={{ t }}">{{ t }}</a>
+                    {% endfor %}
+                </span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-tip">还没有文章。</p>
+        {% endif %}
+    </section>
+
+    <section class="home-section">
+        <div class="section-header">
+            <h2>🏷️ 标签</h2>
+        </div>
+        {% if tags %}
+        <div class="tag-cloud">
+            {% for tag, count in tags.items() %}
+            <a class="tag-pill" href="/blog/?tag={{ tag }}">
+                {{ tag }} <span class="tag-count">{{ count }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-tip">还没有标签。</p>
+        {% endif %}
+    </section>
+
+    <section class="home-section">
+        <div class="section-header">
+            <h2>🎯 站点</h2>
+        </div>
+        <div class="home-cards">
+            <a class="home-card" href="/blog/">
+                <span class="card-icon">📝</span>
+                <h2>博客</h2>
+                <p>学习笔记 / 踩坑心得</p>
+            </a>
+            <a class="home-card" href="/games/">
+                <span class="card-icon">🎮</span>
+                <h2>小游戏</h2>
+                <p>6 个 HTML5 休闲游戏</p>
+            </a>
+            <a class="home-card" href="/about">
+                <span class="card-icon">👤</span>
+                <h2>关于我</h2>
+                <p>自我介绍 / 联系方式</p>
+            </a>
+        </div>
+    </section>
+</div>
+{% endblock %}

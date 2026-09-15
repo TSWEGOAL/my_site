@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>合成大西瓜</title>
+    <style>
+        body {
+            background: #111;
+            color: #eee;
+            font-family: sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 12px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1 { margin: 6px 0; font-size: 20px; }
+        #info { color: #8f8; font-size: 16px; font-weight: bold; margin-bottom: 8px; }
+        #wrap { position: relative; width: min(94vw, 62vh, 520px); margin: 0 auto; }
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            border: 2px solid #444;
+            border-radius: 12px;
+            touch-action: none;
+        }
+        .hint { color: #888; font-size: 13px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🍉 合成大西瓜</h1>
+    <div id="info">得分: 0 &nbsp;|&nbsp; 下一个: 🍒</div>
+    <div id="wrap"><canvas id="game" width="400" height="540"></canvas></div>
+    <p class="hint">移动选位置 · 点击/松手投放 · 相同水果会合并 · 空格重开</p>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height;
+        const WALL = 6, GROUND = H - 6, TOP_LINE = 80;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        // CSRF_TOKEN 已废弃（个人站不再有用户排行榜）
+
+        // 水果等级：0~10，半径与代表色
+        const FRUITS = [
+            { r: 15, color: '#e74c3c', emoji: '🍒' },
+            { r: 20, color: '#e84393', emoji: '🍓' },
+            { r: 26, color: '#9b59b6', emoji: '🍇' },
+            { r: 32, color: '#f39c12', emoji: '🍊' },
+            { r: 39, color: '#f56b2b', emoji: '🍎' },
+            { r: 47, color: '#c0e218', emoji: '🍐' },
+            { r: 56, color: '#ff9ff3', emoji: '🍑' },
+            { r: 66, color: '#f9ca24', emoji: '🍍' },
+            { r: 78, color: '#7bed9f', emoji: '🍈' },
+            { r: 92, color: '#70a1ff', emoji: '🥭' },
+            { r: 110, color: '#2ed573', emoji: '🍉' }
+        ];
+
+        let fruits, score, over, overTimer, current, next, aimX, canDrop, dropCooldown;
+
+        function randLevel() { return Math.floor(Math.random() * 5); }
+
+        function init() {
+            fruits = [];
+            score = 0; over = false; overTimer = 0;
+            current = randLevel(); next = randLevel();
+            aimX = W / 2; canDrop = true; dropCooldown = 0;
+            updateInfo();
+            loop();
+        }
+
+        function updateInfo() {
+            document.getElementById('info').innerHTML =
+                '得分: ' + score + ' &nbsp;|&nbsp; 下一个: ' + FRUITS[next].emoji;
+        }
+
+        function drop() {
+            if (over || !canDrop) return;
+            const f = FRUITS[current];
+            fruits.push({ x: aimX, y: 60, vx: 0, vy: 0, level: current, born: frame });
+            current = next;
+            next = randLevel();
+            canDrop = false;
+            dropCooldown = 18;
+            updateInfo();
+        }
+
+        function physics() {
+            const G = 0.32, REST = 0.22, FRICTION = 0.995;
+
+            for (const f of fruits) {
+                f.vy += G;
+                f.x += f.vx; f.y += f.vy;
+                f.vx *= FRICTION;
+            }
+
+            // 墙壁与地面
+            for (const f of fruits) {
+                const r = FRUITS[f.level].r;
+                if (f.x - r < WALL) { f.x = WALL + r; f.vx = Math.abs(f.vx) * REST; }
+                if (f.x + r > W - WALL) { f.x = W - WALL - r; f.vx = -Math.abs(f.vx) * REST; }
+                if (f.y + r > GROUND) {
+                    f.y = GROUND - r;
+                    f.vy = -Math.abs(f.vy) * REST;
+                    f.vx *= 0.92;
+                    if (Math.abs(f.vy) < 0.6) f.vy = 0;
+                }
+            }
+
+            // 两两碰撞（位置修正 + 简单反弹 + 同级合并）
+            const merged = new Set();
+            for (let i = 0; i < fruits.length; i++) {
+                for (let j = i + 1; j < fruits.length; j++) {
+                    const a = fruits[i], b = fruits[j];
+                    if (merged.has(a) || merged.has(b)) continue;
+                    const ra = FRUITS[a.level].r, rb = FRUITS[b.level].r;
+                    const dx = b.x - a.x, dy = b.y - a.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = ra + rb;
+                    if (dist >= minDist || dist === 0) continue;
+
+                    // 同级 → 合并
+                    if (a.level === b.level && a.level < FRUITS.length - 1 && frame - a.born > 8 && frame - b.born > 8) {
+                        const level = a.level + 1;
+                        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                        merged.add(a); merged.add(b);
+                        fruits.push({
+                            x: mx, y: my,
+                            vx: (a.vx + b.vx) / 2, vy: (a.vy + b.vy) / 2,
+                            level: level, born: frame, pop: 8
+                        });
+                        score += (level + 1) * (level + 2) / 2;  // 三角数得分
+                        updateInfo();
+                        continue;
+                    }
+
+                    // 分离
+                    const nx = dx / dist, ny = dy / dist;
+                    const overlap = minDist - dist;
+                    a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
+                    b.x += nx * overlap / 2; b.y += ny * overlap / 2;
+
+                    // 沿法线的相对速度反弹
+                    const dvn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+                    if (dvn < 0) {
+                        const imp = -dvn * (1 + REST) / 2;
+                        a.vx -= imp * nx; a.vy -= imp * ny;
+                        b.vx += imp * nx; b.vy += imp * ny;
+                    }
+                }
+            }
+            if (merged.size) fruits = fruits.filter(f => !merged.has(f));
+
+            // 游戏结束判定：有水果停留在警戒线上方
+            let danger = false;
+            for (const f of fruits) {
+                const r = FRUITS[f.level].r;
+                if (f.y - r < TOP_LINE - 30 && f.vy > -1) danger = true;
+            }
+            if (danger) overTimer++;
+            else overTimer = 0;
+            if (overTimer > 110 && !over) {
+                over = true;
+                submitScore(score);
+            }
+        }
+
+        function draw() {
+            // 背景
+            ctx.fillStyle = '#1c2733';
+            ctx.fillRect(0, 0, W, H);
+
+            // 警戒线
+            ctx.strokeStyle = danger() ? 'rgba(255,80,80,0.9)' : 'rgba(255,255,255,0.18)';
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(WALL, TOP_LINE);
+            ctx.lineTo(W - WALL, TOP_LINE);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 待投放水果（跟随指针）
+            if (!over) {
+                const f = FRUITS[current];
+                const r = f.r;
+                ctx.globalAlpha = 0.35;
+                ctx.beginPath();
+                ctx.moveTo(aimX, TOP_LINE - 10);
+                ctx.lineTo(aimX, GROUND);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                drawFruit(aimX, 55, current);
+            }
+
+            // 落下的水果
+            for (const f of fruits) {
+                drawFruit(f.x, f.y, f.level, f.pop);
+                if (f.pop) f.pop--;
+            }
+
+            if (over) {
+                ctx.fillStyle = 'rgba(0,0,0,0.62)';
+                ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.font = '26px bold sans-serif';
+                ctx.fillText('游戏结束', W / 2, H / 2 - 16);
+                ctx.font = '15px sans-serif';
+                ctx.fillText('得分: ' + score + ' · 按空格重来', W / 2, H / 2 + 20);
+            }
+        }
+
+        function danger() {
+            for (const f of fruits) {
+                if (f.y - FRUITS[f.level].r < TOP_LINE - 30 && f.vy > -1) return true;
+            }
+            return false;
+        }
+
+        function drawFruit(x, y, level, pop) {
+            const f = FRUITS[level];
+            const r = f.r + (pop ? pop * 0.8 : 0);
+            // 底色圆
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = f.color;
+            ctx.globalAlpha = 0.85;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            // 表情符号
+            ctx.font = Math.floor(r * 1.5) + 'px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(f.emoji, x, y + 1);
+        }
+
+        function submitScore(s) {
+            // 个人本地最高分（localStorage）
+            const best = Math.max(s, parseInt(localStorage.getItem('suikaBest') || 0));
+            localStorage.setItem('suikaBest', best);
+            console.log('本次得分:', s, '历史最高:', best);
+        }
+
+        // 指针定位与投放
+        const wrap = document.getElementById('wrap');
+        function toCanvasX(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            return Math.max(WALL + 5, Math.min(W - WALL - 5,
+                (clientX - rect.left) / rect.width * W));
+        }
+        canvas.addEventListener('pointermove', e => {
+            if (e.pointerType === 'mouse' || e.buttons) aimX = toCanvasX(e.clientX);
+        });
+        canvas.addEventListener('pointerdown', e => {
+            aimX = toCanvasX(e.clientX);
+            if (e.pointerType !== 'mouse') { /* 触屏先移动再松手投放 */ }
+            e.preventDefault();
+        });
+        canvas.addEventListener('pointerup', e => {
+            aimX = toCanvasX(e.clientX);
+            drop();
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === ' ' ) {
+                if (over) init();
+                else drop();
+                e.preventDefault();
+            }
+        });
+
+        let frame = 0;
+        function loop() {
+            frame++;
+            if (dropCooldown > 0) {
+                dropCooldown--;
+                if (dropCooldown === 0) canDrop = true;
+            }
+            // 每帧两次物理子步，提高稳定性
+            if (!over) { physics(); physics(); }
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        init();
+    </script>
+</body>
+</html>

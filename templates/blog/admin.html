@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ '编辑文章' if post else '写文章' }} - 孔亿欺的小站{% endblock %}
+
+{% block content %}
+<nav class="admin-subnav">
+    <a href="{{ url_for('blog.list_posts') }}">← 文章列表</a>
+    <span class="sep">·</span>
+    <a href="{{ url_for('admin_edit_about') }}">✏️ 编辑关于页</a>
+</nav>
+
+<h1>{{ '✏️ 编辑文章' if post else '✍️ 写文章' }}</h1>
+
+<form method="post" class="post-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label>
+        标题
+        <input type="text" name="title" required autofocus
+               value="{{ post.title if post else '' }}">
+    </label>
+
+    <label>
+        标签（英文逗号分隔，例：<code>Python, Flask, 随笔</code>）
+        <input type="text" name="tag" autocomplete="off"
+               value="{{ post.tag.strip(',') if post and post.tag else '' }}">
+    </label>
+
+    <label>
+        内容（支持 Markdown，标题 / 代码块 / 引用都可用）
+        <textarea name="content" rows="16" required>{{ post.content if post else '' }}</textarea>
+    </label>
+
+    <div class="form-actions">
+        <button type="submit">{{ '保存修改' if post else '发布' }}</button>
+        <a href="/blog/" class="btn btn-ghost">取消</a>
+    </div>
+</form>
+{% endblock %}

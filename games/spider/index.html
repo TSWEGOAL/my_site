@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>蜘蛛纸牌</title>
+    <style>
+        :root { --felt: #1e6b4f; }
+        * { box-sizing: border-box; }
+        body {
+            background: #14211c;
+            color: #eee;
+            font-family: sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 12px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1 { margin: 6px 0; font-size: 20px; }
+        #toolbar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        #toolbar button, #toolbar select {
+            background: #f7d154;
+            color: #333;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        #toolbar select { background: #fff; }
+        #toolbar .stat { color: #f7d154; font-weight: bold; }
+        #boardWrap { width: min(97vw, 68vh, 900px); margin: 0 auto; position: relative; }
+        #board {
+            width: 720px;
+            transform-origin: top left;
+            position: relative;
+            background: var(--felt);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .col {
+            position: absolute;
+            width: 64px;
+            border: 2px dashed rgba(255,255,255,0.25);
+            border-radius: 7px;
+            min-height: 92px;
+        }
+        .col.hl { border-color: #ffe08a; background: rgba(255,224,138,0.12); }
+        .card {
+            position: absolute;
+            width: 64px;
+            height: 90px;
+            border-radius: 7px;
+            background: #fff;
+            color: #222;
+            font-size: 17px;
+            font-weight: bold;
+            line-height: 1.05;
+            padding: 4px 6px;
+            text-align: left;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+            cursor: pointer;
+        }
+        .card.red { color: #d0342c; }
+        .card.back {
+            background: repeating-linear-gradient(45deg, #3a6ea5, #3a6ea5 6px, #315f92 6px, #315f92 12px);
+            border: 2px solid #fff;
+        }
+        .card.sel { outline: 3px solid #ffd23f; box-shadow: 0 0 12px rgba(255,210,63,0.8); }
+        .card .rank { display: block; }
+        .card .suit { display: block; font-size: 22px; margin-top: 6px; }
+        #stock {
+            position: absolute;
+            width: 64px; height: 90px;
+            border-radius: 7px;
+            cursor: pointer;
+        }
+        .foundation {
+            position: absolute;
+            width: 64px; height: 90px;
+            border-radius: 7px;
+            border: 2px dashed rgba(255,255,255,0.35);
+        }
+        .foundation .fsuit {
+            font-size: 34px;
+            color: #fff;
+            text-align: center;
+            line-height: 86px;
+            opacity: 0.9;
+        }
+        .hint { color: #9db8aa; font-size: 13px; margin-top: 10px; }
+        #msg {
+            position: fixed;
+            left: 50%; top: 40%;
+            transform: translate(-50%, -50%);
+            background: rgba(20,33,28,0.94);
+            border: 2px solid #f7d154;
+            border-radius: 14px;
+            padding: 28px 42px;
+            font-size: 20px;
+            color: #f7d154;
+            display: none;
+            z-index: 10;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>♠️ 蜘蛛纸牌</h1>
+    <div id="toolbar">
+        <select id="difficulty">
+            <option value="1" selected>1 花色（简单）</option>
+            <option value="2">2 花色（中等）</option>
+            <option value="4">4 花色（困难）</option>
+        </select>
+        <button id="btnDeal">发牌 (剩 5)</button>
+        <button id="btnUndo">撤销</button>
+        <button id="btnNew">重开</button>
+        <span class="stat">完成 <span id="done">0</span>/8 · 得分 <span id="score">0</span></span>
+    </div>
+    <div id="boardWrap">
+        <div id="board"></div>
+    </div>
+    <p class="hint">点击选牌（可整串）→ 点击目标列移动 · K 到 A 同花色整组自动收走 · 发牌前列不能有空</p>
+    <div id="msg"></div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        // CSRF_TOKEN 已废弃（个人站不再有用户排行榜）
+
+        const SUITS = ['♠', '♥', '♦', '♣'];
+        const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+        const COL_W = 72;   // 列间距
+        const CARD_H = 90;
+        const OFF_UP = 24, OFF_DOWN = 10;
+
+        let cols, stock, completed, score, selected, history, suits;
+
+        function newDeck(nSuits) {
+            const deck = [];
+            const useSuits = {1: [0], 2: [0, 1], 4: [0, 1, 2, 3]}[nSuits];
+            for (let d = 0; d < 8; d++) {
+                for (const s of useSuits) {
+                    for (let r = 0; r < 13; r++) deck.push({ r: r, s: s });
+                }
+            }
+            // 洗牌
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        function snapshot() {
+            return JSON.stringify({
+                cols: cols.map(c => c.map(k => [k.r, k.s, k.up ? 1 : 0])),
+                stock: stock.map(k => [k.r, k.s]),
+                completed: completed,
+                score: score
+            });
+        }
+        function restore(snap) {
+            const st = JSON.parse(snap);
+            cols = st.cols.map(c => c.map(k => ({ r: k[0], s: k[1], up: !!k[2] })));
+            stock = st.stock.map(k => ({ r: k[0], s: k[1], up: false }));
+            completed = st.completed;
+            score = st.score;
+            selected = null;
+            render();
+        }
+
+        function init() {
+            suits = parseInt(document.getElementById('difficulty').value);
+            const deck = newDeck(suits);
+            cols = Array.from({length: 10}, () => []);
+            // 前 4 列 6 张，后 6 列 5 张，共 54 张
+            for (let c = 0; c < 10; c++) {
+                const n = c < 4 ? 6 : 5;
+                for (let i = 0; i < n; i++) {
+                    const k = deck.pop();
+                    k.up = (i === n - 1);
+                    cols[c].push(k);
+                }
+            }
+            stock = deck;  // 剩 50 张
+            completed = 0; score = 0;
+            selected = null;
+            history = [];
+            render();
+        }
+
+        // ---------- 规则 ----------
+        function movableFrom(col, idx) {
+            // 从 idx 到列尾必须是同花色连续递减
+            const c = cols[col];
+            for (let i = idx; i < c.length - 1; i++) {
+                if (!c[i].up || !c[i+1].up) return false;
+                if (c[i].s !== c[i+1].s || c[i].r !== c[i+1].r + 1) return false;
+            }
+            return c[idx].up;
+        }
+
+        function canDrop(movingHead, targetCol) {
+            const c = cols[targetCol];
+            if (!c.length) return true;
+            return c[c.length-1].up && c[c.length-1].r === movingHead.r + 1;
+        }
+
+        function checkComplete() {
+            for (let c = 0; c < 10; c++) {
+                const col = cols[c];
+                if (col.length < 13) continue;
+                const tail = col.slice(-13);
+                if (tail.every(k => k.up) &&
+                    tail.every((k, i) => k.s === tail[0].s) &&
+                    tail.every((k, i) => k.r === 12 - i)) {
+                    col.splice(-13);
+                    completed++;
+                    score += 500;
+                    flipTop(c);
+                    submitScore(score);
+                    updateStats();
+                    if (completed === 8) return win();
+                }
+            }
+        }
+
+        function flipTop(c) {
+            const col = cols[c];
+            if (col.length && !col[col.length-1].up) col[col.length-1].up = true;
+        }
+
+        function deal() {
+            if (cols.some(c => c.length === 0)) {
+                return showMsg('有空列时不能发牌');
+            }
+            if (!stock.length) return showMsg('牌已发完');
+            history.push(snapshot());
+            for (let c = 0; c < 10; c++) {
+                const k = stock.pop();
+                k.up = true;
+                cols[c].push(k);
+            }
+            checkComplete();
+            render();
+        }
+
+        function onCardClick(col, idx) {
+            if (!cols[col][idx].up) return;
+            if (selected && selected.col === col && selected.idx === idx) {
+                selected = null; render(); return;
+            }
+            if (selected) return tryMove(col);
+            if (!movableFrom(col, idx)) return;
+            selected = { col: col, idx: idx };
+            render();
+        }
+
+        function onColClick(col) {
+            if (selected) tryMove(col);
+        }
+
+        function tryMove(targetCol) {
+            const { col: from, idx } = selected;
+            if (from === targetCol) { selected = null; render(); return; }
+            const moving = cols[from].slice(idx);
+            if (!canDrop(moving[0], targetCol)) { selected = null; render(); return; }
+
+            history.push(snapshot());
+            cols[from].splice(idx);
+            cols[targetCol].push(...moving);
+            flipTop(from);
+            selected = null;
+            checkComplete();
+            render();
+        }
+
+        function undo() {
+            if (!history.length) return;
+            restore(history.pop());
+            updateStats();
+        }
+
+        function win() {
+            showMsg('🎉 全部完成！<br>最终得分: ' + score);
+            submitScore(score);
+        }
+
+        function showMsg(text) {
+            const m = document.getElementById('msg');
+            m.innerHTML = text + '<br><br><button onclick="this.parentNode.style.display=\'none\'" style="padding:8px 20px;border:none;border-radius:8px;background:#f7d154;font-weight:bold;cursor:pointer">继续</button>';
+            m.style.display = 'block';
+            setTimeout(() => { m.style.display = 'none'; }, 2600);
+        }
+
+        function updateStats() {
+            document.getElementById('done').textContent = completed;
+            document.getElementById('score').textContent = score;
+            document.getElementById('btnDeal').textContent = '发牌 (剩 ' + stock.length / 10 + ')';
+        }
+
+        function submitScore(s) {
+            // 个人本地最高分（localStorage）
+            const best = Math.max(s, parseInt(localStorage.getItem('spiderBest') || 0));
+            localStorage.setItem('spiderBest', best);
+            console.log('本次得分:', s, '历史最高:', best);
+        }
+
+        // ---------- 渲染 ----------
+        function render() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            const topY = 10;
+
+            // 牌堆
+            const stockEl = document.createElement('div');
+            stockEl.id = 'stock';
+            stockEl.style.left = '10px';
+            stockEl.style.top = topY + 'px';
+            stockEl.className = 'card back';
+            stockEl.style.position = 'absolute';
+            stockEl.title = '点击发牌';
+            stockEl.onclick = deal;
+            stockEl.style.display = stock.length ? 'block' : 'none';
+            board.appendChild(stockEl);
+
+            // 完成区
+            for (let i = 0; i < 8; i++) {
+                const f = document.createElement('div');
+                f.className = 'foundation';
+                f.style.left = (720 - 10 - (8 - i) * 72) + 'px';
+                f.style.top = topY + 'px';
+                f.innerHTML = '<div class="fsuit">' + (i < completed ? SUITS[suits === 1 ? 0 : i % (suits === 2 ? 2 : 4)] : '') + '</div>';
+                board.appendChild(f);
+            }
+
+            // 10 列
+            let maxH = 0;
+            for (let c = 0; c < 10; c++) {
+                const colEl = document.createElement('div');
+                colEl.className = 'col' + (selected && selected.col === c ? ' hl' : '');
+                colEl.style.left = (10 + c * COL_W) + 'px';
+                colEl.style.top = (topY + CARD_H + 14) + 'px';
+                colEl.style.height = Math.max(92, cols[c].length * OFF_UP + CARD_H) + 'px';
+                colEl.onclick = e => { e.stopPropagation(); onColClick(c); };
+
+                cols[c].forEach((k, i) => {
+                    const el = document.createElement('div');
+                    if (!k.up) {
+                        el.className = 'card back';
+                    } else {
+                        el.className = 'card' + ((k.s === 1 || k.s === 2) ? ' red' : '');
+                        el.innerHTML = '<span class="rank">' + RANKS[k.r] + '</span><span class="suit">' + SUITS[k.s] + '</span>';
+                        if (selected && selected.col === c && i >= selected.idx) el.classList.add('sel');
+                        el.onclick = e => { e.stopPropagation(); onCardClick(c, i); };
+                    }
+                    el.style.top = (i * (k.up ? OFF_UP : OFF_DOWN)) + 'px';
+                    colEl.appendChild(el);
+                });
+                maxH = Math.max(maxH, topY + CARD_H + 14 + colEl.offsetHeight + 10);
+                board.appendChild(colEl);
+            }
+            board.style.height = Math.max(560, maxH) + 'px';
+            updateStats();
+            rescale();
+        }
+
+        // 整体缩放适配窗口宽度（大屏可放大到 1.25 倍）
+        function rescale() {
+            const wrap = document.getElementById('boardWrap');
+            const board = document.getElementById('board');
+            const s = Math.min(1.25, wrap.clientWidth / 740);
+            board.style.transform = 'scale(' + s + ')';
+            wrap.style.height = (board.offsetHeight * s) + 'px';
+        }
+        window.addEventListener('resize', rescale);
+
+        document.getElementById('btnDeal').onclick = deal;
+        document.getElementById('btnUndo').onclick = undo;
+        document.getElementById('btnNew').onclick = () => { if (confirm('重新开始？')) init(); };
+        document.getElementById('difficulty').onchange = () => init();
+
+        init();
+    </script>
+</body>
+</html>

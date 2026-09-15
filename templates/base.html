@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}孔亿欺的小站{% endblock %}</title>
+    <meta name="description" content="{% block description %}孔亿欺的个人博客 — 学习笔记、项目心得、小游戏{% endblock %}">
+    <meta name="author" content="孔亿欺">
+    <!-- 站点图标：现代浏览器优先用 SVG，老浏览器 / 收藏夹回落到 ICO -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="icon" type="image/x-icon" sizes="32x32" href="/static/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="brand"><span class="brand-dot">●</span> 孔亿欺的小站</a>
+        <div class="nav-links">
+            <a href="/" class="{% if request.path == '/' %}active{% endif %}">首页</a>
+            <a href="/blog/" class="{% if request.path.startswith('/blog') %}active{% endif %}">📝 博客</a>
+            <a href="/games/" class="{% if request.path.startswith('/games') %}active{% endif %}">小游戏</a>
+            <a href="/about" class="{% if request.path == '/about' %}active{% endif %}">关于</a>
+        </div>
+        <div class="nav-auth">
+            {% if is_admin %}
+            <span class="who">👤 {{ session.get('admin_name') }}</span>
+            <form method="post" action="/admin/logout" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="link-btn">登出</button>
+            </form>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flashes">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <span>© 2026 孔亿欺的小站 · 个人博客</span>
+            <span class="footer-links">
+                <a href="/blog/">博客</a> · <a href="/games/">小游戏</a> · <a href="/about">关于</a>
+                {% if is_admin %}
+                · <a href="/blog/admin/new">写文章</a>
+                {% else %}
+                · <a href="/admin/login">管理</a>
+                {% endif %}
+                <!-- ICP 占位：拿到备案号后替换两个数字 -->
+                · <a class="beian" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">备案中</a>
+            </span>
+        </div>
+    </footer>
+</body>
+</html>

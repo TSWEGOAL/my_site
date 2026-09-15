@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}管理员登录 - 孔亿欺的小站{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+    <h2>🔒 管理员登录</h2>
+    <p class="auth-hint">仅供站点管理员使用</p>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+            <label>用户名</label>
+            <input type="text" name="username" required autofocus autocomplete="username">
+        </div>
+        <div class="form-row">
+            <label>密码</label>
+            <input type="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">登录</button>
+    </form>
+</div>
+{% endblock %}

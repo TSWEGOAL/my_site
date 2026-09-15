@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>笨鸟先飞</title>
+    <style>
+        body {
+            background: #111;
+            color: #eee;
+            font-family: sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 16px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1 { margin: 8px 0; font-size: 20px; }
+        #score { color: #8f8; font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        #stage {
+            position: relative;
+            width: min(94vw, 58vh, 540px);
+            margin: 0 auto;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #444;
+        }
+        canvas { display: block; width: 100%; height: auto; touch-action: none; }
+        .hint { color: #888; font-size: 13px; margin-top: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🐦 笨鸟先飞</h1>
+    <div id="score">得分: 0</div>
+    <div id="stage"><canvas id="game" width="380" height="560"></canvas></div>
+    <p class="hint">空格 / 点击屏幕扇翅膀 · 死后按空格重来</p>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height;
+
+        const GROUND = H - 40;
+        const GRAVITY = 0.35, FLAP = -6.2;
+        const PIPE_W = 62, PIPE_GAP = 165, PIPE_SPACING = 210;
+
+        let bird, pipes, score, over, started, frame, best = 0, hueShift = 0;
+
+        function init() {
+            bird = { x: 100, y: H/2, v: 0, r: 14 };
+            pipes = [];
+            score = 0; over = false; started = false; frame = 0;
+            updateScore();
+            loop();
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = '得分: ' + score;
+        }
+
+        function spawnPipe() {
+            const gapY = 90 + Math.random() * (GROUND - 90 - PIPE_GAP - 80);
+            pipes.push({ x: W + 40, gapY: gapY, passed: false });
+        }
+
+        function flap() {
+            if (over) { init(); return; }
+            started = true;
+            bird.v = FLAP;
+        }
+
+        function step() {
+            if (!started || over) return;
+            frame++;
+            bird.v += GRAVITY;
+            bird.y += bird.v;
+
+            if (frame % 70 === 0) spawnPipe();
+
+            for (const p of pipes) {
+                p.x -= 2.6;
+                if (!p.passed && p.x + PIPE_W < bird.x) {
+                    p.passed = true;
+                    score++;
+                    updateScore();
+                }
+            }
+            pipes = pipes.filter(p => p.x > -PIPE_W - 10);
+
+            // 碰撞
+            if (bird.y + bird.r >= GROUND || bird.y - bird.r <= 0) return endGame();
+            for (const p of pipes) {
+                if (bird.x + bird.r > p.x && bird.x - bird.r < p.x + PIPE_W) {
+                    if (bird.y - bird.r < p.gapY || bird.y + bird.r > p.gapY + PIPE_GAP)
+                        return endGame();
+                }
+            }
+        }
+
+        function drawBird() {
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            ctx.rotate(Math.max(-0.5, Math.min(1, bird.v * 0.08)));
+            // 身体
+            ctx.fillStyle = '#f7d154';
+            ctx.beginPath(); ctx.arc(0, 0, bird.r, 0, Math.PI * 2); ctx.fill();
+            // 翅膀
+            const wing = Math.sin(frame * 0.4) * 4;
+            ctx.fillStyle = '#e8a92c';
+            ctx.beginPath(); ctx.ellipse(-4, 2, 7, 4 + Math.abs(wing)/2, 0, 0, Math.PI*2); ctx.fill();
+            // 眼睛
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(5, -4, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(6, -4, 2, 0, Math.PI * 2); ctx.fill();
+            // 嘴
+            ctx.fillStyle = '#e06b3a';
+            ctx.beginPath();
+            ctx.moveTo(10, 0); ctx.lineTo(17, 2); ctx.lineTo(10, 5); ctx.closePath(); ctx.fill();
+            ctx.restore();
+        }
+
+        function draw() {
+            // 天空（颜色随时间缓慢变化）
+            const g = ctx.createLinearGradient(0, 0, 0, H);
+            g.addColorStop(0, `hsl(${(200 + hueShift) % 360}, 60%, 62%)`);
+            g.addColorStop(1, `hsl(${(160 + hueShift) % 360}, 55%, 80%)`);
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+
+            // 云
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            for (let i = 0; i < 3; i++) {
+                const cx = ((frame * 0.4 + i * 160) % (W + 80)) - 40;
+                ctx.beginPath();
+                ctx.arc(cx, 70 + i * 45, 20, 0, Math.PI*2);
+                ctx.arc(cx + 18, 66 + i * 45, 15, 0, Math.PI*2);
+                ctx.arc(cx - 16, 74 + i * 45, 14, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // 管道
+            for (const p of pipes) {
+                ctx.fillStyle = '#5cb85c';
+                ctx.strokeStyle = '#3d8b3d';
+                ctx.lineWidth = 3;
+                ctx.fillRect(p.x, 0, PIPE_W, p.gapY);
+                ctx.strokeRect(p.x, -5, PIPE_W, p.gapY + 5);
+                ctx.fillRect(p.x - 4, p.gapY - 18, PIPE_W + 8, 18);
+                ctx.strokeRect(p.x - 4, p.gapY - 18, PIPE_W + 8, 18);
+                const bottomY = p.gapY + PIPE_GAP;
+                ctx.fillRect(p.x, bottomY, PIPE_W, GROUND - bottomY);
+                ctx.strokeRect(p.x, bottomY, PIPE_W, GROUND - bottomY + 5);
+                ctx.fillRect(p.x - 4, bottomY, PIPE_W + 8, 18);
+                ctx.strokeRect(p.x - 4, bottomY, PIPE_W + 8, 18);
+            }
+
+            // 地面
+            ctx.fillStyle = '#d9a066';
+            ctx.fillRect(0, GROUND, W, H - GROUND);
+            ctx.fillStyle = '#7ec850';
+            ctx.fillRect(0, GROUND, W, 12);
+
+            drawBird();
+
+            // 状态文字
+            ctx.textAlign = 'center';
+            if (!started && !over) {
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = '#fff';
+                ctx.font = '20px sans-serif';
+                ctx.fillText('点击或按空格起飞', W / 2, H / 2);
+            }
+            if (over) {
+                ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = '#fff';
+                ctx.font = '26px bold sans-serif';
+                ctx.fillText('游戏结束', W / 2, H / 2 - 20);
+                ctx.font = '16px sans-serif';
+                ctx.fillText('得分: ' + score + ' · 按空格重来', W / 2, H / 2 + 16);
+            }
+        }
+
+        function endGame() {
+            over = true;
+            showBest(s);
+        }
+
+        // 个人本地最佳分（localStorage）
+        function showBest(s) {
+            const best = Math.max(s, parseInt(localStorage.getItem('flappyBest') || 0));
+            localStorage.setItem('flappyBest', best);
+            console.log('本次得分:', s, '历史最高:', best);
+        }
+
+        function loop() {
+            step();
+            draw();
+            hueShift = (hueShift + 0.1) % 360;
+            requestAnimationFrame(loop);
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === ' ') { flap(); e.preventDefault(); }
+        });
+        canvas.addEventListener('pointerdown', e => { flap(); e.preventDefault(); });
+        document.getElementById('stage').addEventListener('pointerdown', e => { flap(); e.preventDefault(); });
+
+        init();
+    </script>
+</body>
+</html>

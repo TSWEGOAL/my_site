@@ -1,0 +1,44 @@
+[
+  {
+    "id": "snake",
+    "name": "贪吃蛇",
+    "description": "经典贪吃蛇，吃食物变长",
+    "icon": "🐍",
+    "controls": "方向键 / WASD，手机可滑动屏幕"
+  },
+  {
+    "id": "tetris",
+    "name": "俄罗斯方块",
+    "description": "经典俄罗斯方块，消行得分",
+    "icon": "🧱",
+    "controls": "← → 移动 · ↑ 旋转 · ↓ 加速 · 空格瞬降"
+  },
+  {
+    "id": "2048",
+    "name": "2048",
+    "description": "滑动合并数字，冲向 2048",
+    "icon": "🔢",
+    "controls": "方向键，手机滑动屏幕"
+  },
+  {
+    "id": "flappy",
+    "name": "笨鸟先飞",
+    "description": "点击扇翅膀，穿过管道别撞墙",
+    "icon": "🐦",
+    "controls": "空格 / 点击屏幕扇翅膀"
+  },
+  {
+    "id": "suika",
+    "name": "合成大西瓜",
+    "description": "投下水果，相同的会合并变大",
+    "icon": "🍉",
+    "controls": "移动鼠标 / 手指选位置，点击投放"
+  },
+  {
+    "id": "spider",
+    "name": "蜘蛛纸牌",
+    "description": "按 K 到 A 整理牌，凑满整组花色",
+    "icon": "♠️",
+    "controls": "点击选牌，再点击目标位置移动"
+  }
+]

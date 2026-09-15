@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>2048</title>
+    <style>
+        body {
+            background: #111;
+            color: #eee;
+            font-family: sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 16px;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1 { margin: 8px 0; font-size: 22px; color: #fff; }
+        #info { color: #8f8; margin-bottom: 12px; font-size: 15px; }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            width: min(92vw, 74vh, 440px);
+            aspect-ratio: 1;
+            margin: 0 auto;
+            background: #2a2420;
+            padding: 8px;
+            border-radius: 10px;
+        }
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: clamp(18px, 6vw, 30px);
+            font-weight: bold;
+            background: #3a332d;
+            color: #eee;
+            transition: transform 0.08s;
+        }
+        .cell.pop { animation: pop 0.15s ease; }
+        @keyframes pop { from { transform: scale(0.7); } to { transform: scale(1); } }
+        .hint { color: #888; font-size: 13px; margin-top: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🔢 2048</h1>
+    <div id="info">得分: 0</div>
+    <div id="board"></div>
+    <p class="hint">方向键或滑动屏幕合并相同数字 · 空格重开</p>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        // CSRF_TOKEN 已废弃（个人站不再有用户排行榜）
+
+        let grid, score, best = 0, over, won;
+
+        const COLORS = {
+            2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563',
+            32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61',
+            512: '#edc850', 1024: '#edc53f', 2048: '#edc22e'
+        };
+
+        const boardEl = document.getElementById('board');
+
+        function init() {
+            grid = Array.from({length: 4}, () => [0,0,0,0]);
+            score = 0; over = false; won = false;
+            spawn(); spawn();
+            render();
+        }
+
+        function spawn() {
+            const empty = [];
+            for (let r = 0; r < 4; r++)
+                for (let c = 0; c < 4; c++)
+                    if (!grid[r][c]) empty.push([r, c]);
+            if (!empty.length) return;
+            const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+            grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+        }
+
+        function render(newCells) {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const d = document.createElement('div');
+                    const v = grid[r][c];
+                    d.className = 'cell' + (newCells && newCells.has(r + ',' + c) ? ' pop' : '');
+                    if (v) {
+                        d.textContent = v;
+                        const bg = COLORS[v] || '#3c3a32';
+                        d.style.background = bg;
+                        d.style.color = v <= 4 ? '#776e65' : '#fff';
+                        if (v >= 1024) d.style.fontSize = 'clamp(14px, 4.5vw, 22px)';
+                        else if (v >= 128) d.style.fontSize = 'clamp(16px, 5vw, 26px)';
+                    }
+                    boardEl.appendChild(d);
+                }
+            }
+            document.getElementById('info').textContent = '得分: ' + score;
+        }
+
+        function slide(row) {
+            // 压缩 + 合并一行，返回 [新行, 本行得分, 是否有变化]
+            let arr = row.filter(v => v);
+            let gained = 0;
+            for (let i = 0; i < arr.length - 1; i++) {
+                if (arr[i] === arr[i+1]) {
+                    arr[i] *= 2;
+                    gained += arr[i];
+                    if (arr[i] === 2048) won = true;
+                    arr.splice(i+1, 1);
+                }
+            }
+            while (arr.length < 4) arr.push(0);
+            const changed = arr.some((v, i) => v !== row[i]);
+            return [arr, gained, changed];
+        }
+
+        function move(dir) {
+            if (over) return;
+            let moved = false, gained = 0;
+            const newCells = new Set();
+
+            for (let i = 0; i < 4; i++) {
+                let line;
+                if (dir === 'left') line = grid[i].slice();
+                else if (dir === 'right') line = grid[i].slice().reverse();
+                else if (dir === 'up') line = [grid[0][i], grid[1][i], grid[2][i], grid[3][i]];
+                else line = [grid[3][i], grid[2][i], grid[1][i], grid[0][i]];
+
+                const [arr, g, changed] = slide(line);
+                if (!changed) continue;
+                moved = true;
+                gained += g;
+
+                // 记录合并产生的新值位置（用于动画）
+                for (let j = 0; j < 4; j++) {
+                    if (arr[j] && arr[j] !== line[j]) newCells.add(
+                        (dir === 'left' || dir === 'right') ? i + ',' + j : j + ',' + i
+                    );
+                }
+
+                if (dir === 'left') grid[i] = arr;
+                else if (dir === 'right') grid[i] = arr.reverse();
+                else if (dir === 'up') for (let r = 0; r < 4; r++) grid[r][i] = arr[r];
+                else for (let r = 0; r < 4; r++) grid[r][i] = arr[3 - r];
+            }
+
+            if (!moved) return;
+            score += gained;
+            spawn();
+            render(newCells);
+
+            if (won && !over) {
+                // 达成 2048，继续玩
+            }
+            if (isGameOver()) {
+                over = true;
+                submitScore(score);
+                setTimeout(() => alert('游戏结束！得分: ' + score + '\n按空格重新开始'), 100);
+            }
+        }
+
+        function canMove(r, c) {
+            const v = grid[r][c];
+            if (!v) return true;
+            if (c < 3 && grid[r][c+1] === v) return true;
+            if (r < 3 && grid[r+1][c] === v) return true;
+            return false;
+        }
+        function isGameOver() {
+            for (let r = 0; r < 4; r++)
+                for (let c = 0; c < 4; c++)
+                    if (canMove(r, c)) return false;
+            return true;
+        }
+
+        function submitScore(s) {
+            // 个人本地最高分（localStorage）
+            const best = Math.max(s, parseInt(localStorage.getItem('g2048Best') || 0));
+            localStorage.setItem('g2048Best', best);
+            console.log('本次得分:', s, '历史最高:', best);
+        }
+
+        document.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            if (k === ' ') { if (over) init(); e.preventDefault(); return; }
+            const map = { arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right',
+                          arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down' };
+            if (map[k]) { move(map[k]); e.preventDefault(); }
+        });
+
+        // 触屏滑动
+        let ts = null;
+        document.addEventListener('touchstart', e => {
+            ts = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            if (!ts) return;
+            const dx = e.changedTouches[0].clientX - ts.x;
+            const dy = e.changedTouches[0].clientY - ts.y;
+            ts = null;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+            if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+            else move(dy > 0 ? 'down' : 'up');
+        });
+
+        init();
+    </script>
+</body>
+</html>

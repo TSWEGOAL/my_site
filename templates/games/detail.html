@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ game.name }} - 孔亿欺的小站{% endblock %}
+
+{% block content %}
+<div class="game-info-bar">
+    <h1>{{ game.icon or '🕹️' }} {{ game.name }}</h1>
+    <p class="game-desc">{{ game.description }}</p>
+    <span class="spacer"></span>
+    <a class="btn btn-ghost" href="/games/">← 返回列表</a>
+</div>
+
+<div class="game-shell" id="gameShell">
+    <button class="btn-fullscreen" id="btnFullscreen" title="全屏/退出全屏">⛶ 全屏</button>
+    <iframe src="/games/{{ game.id }}/assets/index.html"></iframe>
+</div>
+
+{% if game.controls %}
+<div class="game-controls-hint">
+    <strong>操作：</strong>
+    {% for part in game.controls.split('，') %}
+        {% if not loop.first %}·{% endif %}
+        <span>{{ part.strip() }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+(function () {
+    var shell = document.getElementById('gameShell');
+    var btn = document.getElementById('btnFullscreen');
+    btn.addEventListener('click', function () {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            shell.requestFullscreen && shell.requestFullscreen();
+        }
+    });
+})();
+</script>
+{% endblock %}

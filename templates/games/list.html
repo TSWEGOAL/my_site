@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}游戏 - 孔亿欺的小站{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🎮 游戏</h1>
+</div>
+<div class="game-list">
+    {% for game in games %}
+    <a class="game-card" href="/games/{{ game.id }}">
+        <span class="card-icon">{{ game.icon or '🕹️' }}</span>
+        <h3>{{ game.name }}</h3>
+        <p>{{ game.description }}</p>
+        <span class="card-play">开始玩 →</span>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

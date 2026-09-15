@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+
+# Flask / SQLite
+instance/
+*.db
+*.sqlite3
+
+# 秘钥 & 环境
+.env
+.env.local
+
+# 助手工作目录（memory 日志里有明文账号密码，绝不能进仓库）
+.workbuddy/
+
+# 测试缓存
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log

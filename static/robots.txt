@@ -1,0 +1,11 @@
+# robots.txt — 孔亿欺的小站
+# 协议说明：https://www.robotstxt.org/
+
+User-agent: *
+Allow: /
+
+# 后台管理区不开放抓取（已经需要登录，也没必要暴露给搜索引擎）
+Disallow: /admin/
+
+# 站点地图：绑定正式域名后，取消下一行注释并替换成真实域名
+# Sitemap: https://your-domain.top/sitemap.xml

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}编辑关于页 - 孔亿欺的小站{% endblock %}
+
+{% block content %}
+<h1>✏️ 编辑关于页</h1>
+
+<form method="post" class="post-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label>
+        页面标题（显示在 H1 和 &lt;title&gt;）
+        <input type="text" name="title" required autofocus
+               value="{{ page.title or '关于我' }}">
+    </label>
+
+    <label>
+        内容（Markdown 源：标题 / 列表 / 代码块 / 引用 / 链接都支持）
+        <textarea name="content" rows="20" required>{{ page.content }}</textarea>
+    </label>
+
+    <p class="form-hint">
+        Slug 固定为 <code>about</code>，绑定路由 <code>/about</code>。
+        预览：<a href="{{ url_for('about') }}" target="_blank">/about →</a>
+    </p>
+
+    <div class="form-actions">
+        <button type="submit">保存</button>
+        <a href="{{ url_for('about') }}" class="btn btn-ghost">取消</a>
+    </div>
+</form>
+{% endblock %}
+</content>
+</invoke>
