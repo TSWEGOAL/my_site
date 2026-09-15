@@ -32,6 +32,11 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY',
 _db_url = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
 if _db_url.startswith('postgres://'):  # Render/Heroku 旧式前缀，SQLAlchemy 不认
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+# SQLAlchemy 遇到裸 postgresql:// 会默认去 import psycopg2，
+# 但 requirements 里装的是 psycopg3（psycopg[binary]），
+# 不显式指定驱动就会 ModuleNotFoundError: No module named 'psycopg2'。
+if _db_url.startswith('postgresql://'):
+    _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # 云数据库会掐空闲连接，pre_ping 让 SQLAlchemy 取连接前先探活
