@@ -7,5 +7,8 @@ Allow: /
 # 后台管理区不开放抓取（已经需要登录，也没必要暴露给搜索引擎）
 Disallow: /admin/
 
+# 健康检查端点，纯机器探活用，没有收录价值
+Disallow: /healthz
+
 # 站点地图：绑定正式域名后，取消下一行注释并替换成真实域名
 # Sitemap: https://your-domain.top/sitemap.xml

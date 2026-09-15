@@ -178,6 +178,17 @@ def favicon():
                                mimetype='image/x-icon')
 
 
+@app.route('/healthz')
+def healthz():
+    """健康检查端点（Render 面板的 Health Check Path 填 /healthz）。
+
+    刻意不查数据库：Neon 免费档会休眠，查库可能因冷启动超时，
+    被 Render 误判为不健康而反复重启服务。
+    这里只证明「Web 进程活着、能响应请求」。
+    """
+    return 'ok', 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
+
 @app.errorhandler(404)
 def not_found(e):
     return render_template('errors/404.html'), 404
