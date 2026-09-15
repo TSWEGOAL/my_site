@@ -29,13 +29,15 @@ def list_posts():
 
     query = Post.query.order_by(Post.created_at.desc())
     if active_tag:
-        # 简单 LIKE 匹配：tag 存为 "tag1, tag2" 字符串，LIKE '%tag%' 会撞前缀的
-        # 比如查 "test" 也会命中 "untested"。所以先匹配 ",tag," 边界。
-        # 这里用 INSTR 模拟边界匹配：',' || tag || ',' LIKE '%,tag,%'
+        # 边界匹配：tag 存为 ",tag1,tag2,"（带逗号边界），
+        # 避免查 "test" 命中 "untested"。
+        # 注意用 ilike 而不是 like：SQLite 的 LIKE 不区分大小写，
+        # 但 PostgreSQL 的 LIKE 区分大小写，换成 Postgres 后
+        # 大小写不同的 tag 会查不到。ilike 在两个后端行为一致。
         query = query.filter(
-            Post.tag.like(f'%,{active_tag},%')
-            | Post.tag.like(f'{active_tag},%')
-            | Post.tag.like(f'%,{active_tag}')
+            Post.tag.ilike(f'%,{active_tag},%')
+            | Post.tag.ilike(f'{active_tag},%')
+            | Post.tag.ilike(f'%,{active_tag}')
             | (Post.tag == active_tag)
         )
 

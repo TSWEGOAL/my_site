@@ -6,6 +6,6 @@ python-dotenv>=1.0
 mistune>=3.0
 gunicorn>=21.2
 
-# 如果要把数据库换成 Render Postgres / Neon / Supabase，
-# 取消下面这行的注释（SQLAlchemy 连 PostgreSQL 需要驱动）
-# psycopg[binary]>=3.1
+# PostgreSQL 驱动：接 Neon / Render Postgres / Supabase 时必需
+# （app.py 读 DATABASE_URL 环境变量切换数据库）
+psycopg[binary]>=3.1
