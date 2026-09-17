@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}关于我 - 孔亿欺的小站{% endblock %}
+{% block title %}{{ page.title }} - 孔亿欺的小站{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>👤 关于我</h1>
+    <h1>👤 {{ page.title }}</h1>
     {% if is_admin_view %}
     <a href="{{ url_for('admin_edit_about') }}" class="btn btn-ghost btn-sm">
         ✏️ 编辑此页

@@ -40,5 +40,33 @@
     "description": "按 K 到 A 整理牌，凑满整组花色",
     "icon": "♠️",
     "controls": "点击选牌，再点击目标位置移动"
+  },
+  {
+    "id": "minesweeper",
+    "name": "扫雷",
+    "description": "经典扫雷，别踩到雷",
+    "icon": "💣",
+    "controls": "左键翻开，右键插旗"
+  },
+    {
+    "id": "breakout",
+    "name": "打砖块",
+    "description": "弹球消砖，别让球掉下去",
+    "icon": "🧱",
+    "controls": "← → 或 A/D 移动，空格发球，P 暂停"
+  },
+  {
+    "id": "sudoku",
+    "name": "数独",
+    "description": "9×9 逻辑填数，每行每列每宫不重复",
+    "icon": "🔢",
+    "controls": "点击格子，键盘 1-9 填数，0 清除"
+  },
+  {
+    "id": "sokoban",
+    "name": "推箱子",
+    "description": "把所有箱子推到目标点",
+    "icon": "📦",
+    "controls": "方向键 / WASD 移动，R 重来"
   }
 ]

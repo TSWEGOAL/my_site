@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>扫雷</title>
+<style>
+  body{background:#111;color:#eee;font-family:sans-serif;text-align:center;margin:0;padding:20px;}
+  h1{margin:10px 0;font-size:20px;}
+  #info{margin-bottom:12px;color:#8f8;}
+  #board{display:inline-grid;gap:2px;background:#333;padding:6px;border-radius:6px;touch-action:manipulation;}
+  .cell{width:32px;height:32px;background:#555;border:none;border-radius:4px;font-size:18px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;}
+  .cell.revealed{background:#222;cursor:default;}
+  .cell.flag{background:#a33;}
+  .cell.mine{background:#c00;}
+  .c1{color:#4af;}.c2{color:#4d4;}.c3{color:#f66;}.c4{color:#a4f;}.c5{color:#fa4;}.c6{color:#4dd;}.c7{color:#eee;}.c8{color:#888;}
+  .hint{color:#888;font-size:13px;margin-top:12px;}
+  button.restart{margin-top:12px;padding:8px 20px;font-size:15px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:8px;cursor:pointer;}
+  button.restart:active{background:#444;}
+  @media(max-width:500px){.cell{width:28px;height:28px;font-size:16px;}}
+</style>
+</head>
+<body>
+<h1>💣 扫雷</h1>
+<div id="info">剩余雷数: 0</div>
+<div id="board"></div>
+<p class="hint">左键翻开 · 右键插旗</p>
+<button class="restart" onclick="init()">重新开始</button>
+
+<script>
+const COLS=9,ROWS=9,MINES=10;
+let grid,revealed,flagged,gameOver,started,flagsLeft;
+const boardEl=document.getElementById('board');
+
+function init(){
+  grid=Array.from({length:ROWS},()=>new Array(COLS).fill(0));
+  revealed=Array.from({length:ROWS},()=>new Array(COLS).fill(false));
+  flagged=Array.from({length:ROWS},()=>new Array(COLS).fill(false));
+  gameOver=false;started=false;flagsLeft=MINES;
+  boardEl.innerHTML='';
+  boardEl.style.gridTemplateColumns=`repeat(${COLS},auto)`;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const b=document.createElement('div');
+    b.className='cell';b.dataset.x=x;b.dataset.y=y;
+    b.addEventListener('click',()=>reveal(x,y));
+    b.addEventListener('contextmenu',e=>{e.preventDefault();flag(x,y);});
+    boardEl.appendChild(b);
+  }
+  updateInfo();
+}
+
+function placeMines(sx,sy){
+  let placed=0;
+  while(placed<MINES){
+    const x=Math.floor(Math.random()*COLS),y=Math.floor(Math.random()*ROWS);
+    if(grid[y][x]===-1)continue;
+    if(Math.abs(x-sx)<=1&&Math.abs(y-sy)<=1)continue;
+    grid[y][x]=-1;placed++;
+  }
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    if(grid[y][x]===-1)continue;
+    let c=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const ny=y+dy,nx=x+dx;
+      if(ny>=0&&ny<ROWS&&nx>=0&&nx<COLS&&grid[ny][nx]===-1)c++;
+    }
+    grid[y][x]=c;
+  }
+}
+
+function cellEl(x,y){return boardEl.children[y*COLS+x];}
+
+function reveal(x,y){
+  if(gameOver||flagged[y][x]||revealed[y][x])return;
+  if(!started){started=true;placeMines(x,y);}
+  revealed[y][x]=true;
+  const el=cellEl(x,y);
+  el.classList.add('revealed');
+  if(grid[y][x]===-1){el.classList.add('mine');el.textContent='💣';endGame(false);return;}
+  if(grid[y][x]>0){el.textContent=grid[y][x];el.classList.add('c'+grid[y][x]);}
+  else{
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const ny=y+dy,nx=x+dx;
+      if(ny>=0&&ny<ROWS&&nx>=0&&nx<COLS&&!revealed[ny][nx])reveal(nx,ny);
+    }
+  }
+  checkWin();
+}
+
+function flag(x,y){
+  if(gameOver||revealed[y][x])return;
+  flagged[y][x]=!flagged[y][x];
+  const el=cellEl(x,y);
+  el.classList.toggle('flag');
+  el.textContent=flagged[y][x]?'🚩':'';
+  flagsLeft+=flagged[y][x]?-1:1;
+  updateInfo();
+}
+
+function checkWin(){
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    if(grid[y][x]!==-1&&!revealed[y][x])return;
+  }
+  endGame(true);
+}
+
+function endGame(win){
+  gameOver=true;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    if(grid[y][x]===-1&&!flagged[y][x]){
+      const el=cellEl(x,y);el.classList.add('revealed');el.textContent='💣';
+    }
+  }
+  document.getElementById('info').textContent=win?'🎉 胜利！':'💥 踩雷了';
+}
+
+function updateInfo(){
+  document.getElementById('info').textContent='剩余雷数: '+flagsLeft;
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>打砖块</title>
+<style>
+  body{background:#111;color:#eee;font-family:sans-serif;text-align:center;margin:0;padding:20px;}
+  h1{margin:10px 0;font-size:20px;}
+  #info{margin-bottom:10px;color:#8f8;}
+  canvas{background:#000;border:2px solid #444;border-radius:6px;display:block;margin:0 auto;max-width:100%;height:auto;touch-action:none;}
+  .hint{color:#888;font-size:13px;margin-top:10px;}
+  .touch-pad{display:none;grid-template-columns:1fr 1fr;gap:10px;justify-content:center;margin-top:14px;max-width:340px;margin-left:auto;margin-right:auto;}
+  .touch-pad button{height:52px;font-size:20px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:10px;touch-action:manipulation;}
+  .touch-pad button:active{background:#444;}
+  @media(hover:none) and (pointer:coarse){.touch-pad{display:grid;}}
+</style>
+</head>
+<body>
+<h1>🧱 打砖块</h1>
+<div id="info">得分: 0 &nbsp;|&nbsp; 生命: 3</div>
+<canvas id="game" width="360" height="480"></canvas>
+<p class="hint">← → 或 A/D 移动 · 空格发球 · P 暂停</p>
+<div class="touch-pad">
+  <button data-act="left">←</button>
+  <button data-act="right">→</button>
+  <button data-act="launch" style="grid-column:span 2;">发球 / 暂停</button>
+</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height;
+const PADDLE_W=80,PADDLE_H=12,BALL_R=7;
+const COLS=8,ROWS=5,BRICK_W=(W-40)/COLS,BRICK_H=18,BRICK_TOP=50,BRICK_LEFT=20;
+
+let paddleX,ball,score,lives,bricks,launched,gameOver,paused,keys={};
+
+function init(){
+  paddleX=W/2-PADDLE_W/2;
+  ball={x:W/2,y:H-60,dx:0,dy:0};
+  score=0;lives=3;launched=false;gameOver=false;paused=false;
+  bricks=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    bricks.push({x:BRICK_LEFT+c*BRICK_W,y:BRICK_TOP+r*BRICK_H,w:BRICK_W-4,h:BRICK_H-4,alive:true,color:`hsl(${r*40+200},70%,55%)`});
+  }
+  updateInfo();
+}
+
+function launch(){
+  if(launched||gameOver)return;
+  launched=true;
+  const angle=(Math.random()*0.5+0.25)*Math.PI;
+  ball.dx=Math.cos(angle)*5*(Math.random()<0.5?1:-1);
+  ball.dy=-Math.sin(angle)*5;
+}
+
+function updateInfo(){
+  document.getElementById('info').textContent='得分: '+score+' | 生命: '+lives;
+}
+
+function loop(){
+  if(gameOver||paused){draw();requestAnimationFrame(loop);return;}
+  if(keys.left)paddleX-=7;
+  if(keys.right)paddleX+=7;
+  paddleX=Math.max(0,Math.min(W-PADDLE_W,paddleX));
+
+  if(launched){
+    ball.x+=ball.dx;ball.y+=ball.dy;
+    if(ball.x-BALL_R<0||ball.x+BALL_R>W)ball.dx*=-1;
+    if(ball.y-BALL_R<0)ball.dy*=-1;
+    if(ball.y+BALL_R>H){lives--;updateInfo();if(lives<=0){gameOver=true;}else{launched=false;ball.x=paddleX+PADDLE_W/2;ball.y=H-60;ball.dx=0;ball.dy=0;}}
+    if(ball.y+BALL_R>H-30&&ball.y+BALL_R<H-10&&ball.x>paddleX&&ball.x<paddleX+PADDLE_W&&ball.dy>0){
+      const hit=(ball.x-(paddleX+PADDLE_W/2))/(PADDLE_W/2);
+      const angle=hit*Math.PI/3;
+      const speed=Math.hypot(ball.dx,ball.dy);
+      ball.dx=Math.sin(angle)*speed;
+      ball.dy=-Math.cos(angle)*speed;
+    }
+    for(const b of bricks){
+      if(!b.alive)continue;
+      if(ball.x+BALL_R>b.x&&ball.x-BALL_R<b.x+b.w&&ball.y+BALL_R>b.y&&ball.y-BALL_R<b.y+b.h){
+        b.alive=false;score+=10;updateInfo();
+        const overlapX=Math.min(ball.x+BALL_R-b.x,b.x+b.w-(ball.x-BALL_R));
+        const overlapY=Math.min(ball.y+BALL_R-b.y,b.y+b.h-(ball.y-BALL_R));
+        if(overlapX<overlapY)ball.dx*=-1;else ball.dy*=-1;
+        break;
+      }
+    }
+    if(bricks.every(b=>!b.alive)){gameOver=true;}
+  }else{
+    ball.x=paddleX+PADDLE_W/2;ball.y=H-60;
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function draw(){
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  for(const b of bricks){
+    if(!b.alive)continue;
+    ctx.fillStyle=b.color;ctx.fillRect(b.x,b.y,b.w,b.h);
+  }
+  ctx.fillStyle='#4cd';ctx.fillRect(paddleX,H-30,PADDLE_W,PADDLE_H);
+  ctx.beginPath();ctx.arc(ball.x,ball.y,BALL_R,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+  if(!launched&&!gameOver){ctx.fillStyle='#aaa';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('按空格发球',W/2,H/2);}
+  if(gameOver){ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.font='24px sans-serif';ctx.textAlign='center';ctx.fillText('游戏结束',W/2,H/2-10);ctx.font='14px sans-serif';ctx.fillText('得分: '+score+'，按空格重来',W/2,H/2+25);}
+  if(paused&&!gameOver){ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText('已暂停',W/2,H/2);}
+}
+
+document.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a')keys.left=true;
+  if(k==='arrowright'||k==='d')keys.right=true;
+  if(k===' '){e.preventDefault();if(gameOver)init();else if(!launched)launch();}
+  if(k==='p'&&!gameOver)paused=!paused;
+});
+document.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a')keys.left=false;
+  if(k==='arrowright'||k==='d')keys.right=false;
+});
+document.querySelector('.touch-pad').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const a=b.dataset.act;
+  if(a==='left')keys.left=true;
+  if(a==='right')keys.right=true;
+  if(a==='launch'){if(gameOver)init();else if(!launched)launch();else paused=!paused;}
+});
+document.querySelector('.touch-pad').addEventListener('touchend',()=>{keys.left=false;keys.right=false;});
+
+init();loop();
+</script>
+</body>
+</html>

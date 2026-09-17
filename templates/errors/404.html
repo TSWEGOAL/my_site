@@ -5,6 +5,22 @@
 <div class="error-page">
     <h1>404</h1>
     <p class="error-msg">你要找的页面不存在</p>
-    <p><a class="btn" href="/">← 回到首页</a></p>
+    <p><a class="btn" href="/" target="_top">← 回到首页</a></p>
 </div>
+
+<script>
+/* 被嵌在游戏 iframe 里时（比如游戏资源 404）：隐藏整站导航，
+   换成紧凑提示 + 跳出框架的链接，避免"在框架里又打开一个首页" */
+if (window.top !== window.self) {
+    document.querySelectorAll('header, footer, nav').forEach(function (el) {
+        el.style.display = 'none';
+    });
+    var box = document.querySelector('.error-page');
+    if (box) {
+        box.innerHTML = '<h1 style="font-size:42px">404</h1>' +
+            '<p class="error-msg">游戏资源加载失败（或不存在）</p>' +
+            '<p><a class="btn" href="/games/" target="_top">← 返回游戏列表</a></p>';
+    }
+}
+</script>
 {% endblock %}

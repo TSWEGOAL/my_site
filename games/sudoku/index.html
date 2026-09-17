@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>数独</title>
+<style>
+  body{background:#111;color:#eee;font-family:sans-serif;text-align:center;margin:0;padding:20px;}
+  h1{margin:10px 0;font-size:20px;}
+  #info{margin-bottom:12px;color:#8f8;}
+  #board{display:inline-grid;grid-template-columns:repeat(9,1fr);gap:1px;background:#666;padding:3px;border-radius:6px;touch-action:manipulation;}
+  .cell{width:38px;height:38px;background:#222;border:none;font-size:20px;font-weight:bold;color:#4af;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;}
+  .cell.given{color:#eee;background:#1a1a1a;cursor:default;}
+  .cell.selected{background:#335;}
+  .cell.error{color:#f44;}
+  .cell:nth-child(3n){border-right:2px solid #666;}
+  .cell:nth-child(9n){border-right:none;}
+  .row3{border-bottom:2px solid #666;}
+  .hint{color:#888;font-size:13px;margin-top:12px;}
+  .pad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;max-width:300px;margin:14px auto 0;}
+  .pad button{height:44px;font-size:18px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:8px;cursor:pointer;}
+  .pad button:active{background:#444;}
+  button.restart{margin-top:12px;padding:8px 20px;font-size:15px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:8px;cursor:pointer;}
+  @media(max-width:500px){.cell{width:32px;height:32px;font-size:17px;}}
+</style>
+</head>
+<body>
+<h1>🔢 数独</h1>
+<div id="info">点击格子后选数字</div>
+<div id="board"></div>
+<div class="pad">
+  <button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button>
+  <button data-n="6">6</button><button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button><button data-n="0">清除</button>
+</div>
+<p class="hint">键盘 1-9 填数 · 0/Delete 清除</p>
+<button class="restart" onclick="init()">换一题</button>
+
+<script>
+const boardEl=document.getElementById('board');
+let puzzle,solution,selected=null;
+
+const BASE=[
+  [5,3,0,0,7,0,0,0,0],
+  [6,0,0,1,9,5,0,0,0],
+  [0,9,8,0,0,0,0,6,0],
+  [8,0,0,0,6,0,0,0,3],
+  [4,0,0,8,0,3,0,0,1],
+  [7,0,0,0,2,0,0,0,6],
+  [0,6,0,0,0,0,2,8,0],
+  [0,0,0,4,1,9,0,0,5],
+  [0,0,0,0,8,0,0,7,9]
+];
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function solve(g){
+  for(let y=0;y<9;y++)for(let x=0;x<9;x++){
+    if(g[y][x]===0){
+      const nums=shuffle([1,2,3,4,5,6,7,8,9]);
+      for(const n of nums){
+        if(valid(g,x,y,n)){g[y][x]=n;if(solve(g))return true;g[y][x]=0;}
+      }
+      return false;
+    }
+  }
+  return true;
+}
+
+function valid(g,x,y,n){
+  for(let i=0;i<9;i++){if(g[y][i]===n||g[i][x]===n)return false;}
+  const bx=Math.floor(x/3)*3,by=Math.floor(y/3)*3;
+  for(let dy=0;dy<3;dy++)for(let dx=0;dx<3;dx++){if(g[by+dy][bx+dx]===n)return false;}
+  return true;
+}
+
+function init(){
+  solution=JSON.parse(JSON.stringify(BASE));
+  solve(solution);
+  puzzle=solution.map(r=>r.slice());
+  let removed=0;
+  while(removed<45){
+    const x=Math.floor(Math.random()*9),y=Math.floor(Math.random()*9);
+    if(puzzle[y][x]!==0){puzzle[y][x]=0;removed++;}
+  }
+  selected=null;
+  render();
+  document.getElementById('info').textContent='点击格子后选数字';
+}
+
+function render(){
+  boardEl.innerHTML='';
+  for(let y=0;y<9;y++)for(let x=0;x<9;x++){
+    const d=document.createElement('div');
+    d.className='cell'+(puzzle[y][x]!==0?' given':'');
+    if(y===2||y===5)d.classList.add('row3');
+    d.dataset.x=x;d.dataset.y=y;
+    d.textContent=puzzle[y][x]||'';
+    if(selected&&selected.x===x&&selected.y===y)d.classList.add('selected');
+    d.addEventListener('click',()=>{
+      if(puzzle[y][x]!==0)return;
+      selected={x,y};render();
+    });
+    boardEl.appendChild(d);
+  }
+}
+
+function place(n){
+  if(!selected)return;
+  const{x,y}=selected;
+  if(puzzle[y][x]!==0)return;
+  puzzle[y][x]=n;
+  const el=boardEl.children[y*9+x];
+  el.textContent=n||'';
+  el.classList.toggle('error',n!==0&&n!==solution[y][x]);
+  if(n===0)el.classList.remove('error');
+  checkWin();
+}
+
+function checkWin(){
+  for(let y=0;y<9;y++)for(let x=0;x<9;x++){
+    if(puzzle[y][x]!==solution[y][x])return;
+  }
+  document.getElementById('info').textContent='🎉 完成！';
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key>='1'&&e.key<='9')place(parseInt(e.key));
+  if(e.key==='0'||e.key==='Delete'||e.key==='Backspace')place(0);
+});
+
+document.querySelector('.pad').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  place(parseInt(b.dataset.n));
+});
+
+init();
+</script>
+</body>
+</html>
