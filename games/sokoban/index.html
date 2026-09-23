@@ -16,20 +16,28 @@
   .box.on{background:#4a4;}
   .player{background:#246;}
   .hint{color:#888;font-size:13px;margin-top:12px;}
+  .btn-row{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .btn-row button{padding:8px 16px;font-size:14px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:8px;cursor:pointer;}
+  .btn-row button:active{background:#444;}
   .touch-pad{display:none;grid-template-columns:repeat(3,64px);gap:8px;justify-content:center;margin-top:14px;}
   .touch-pad button{height:52px;font-size:22px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:10px;touch-action:manipulation;}
   .touch-pad button:active{background:#444;}
   .touch-pad .wide{grid-column:span 3;height:44px;font-size:15px;}
   @media(hover:none) and (pointer:coarse){.touch-pad{display:grid;}}
-  button.restart{margin-top:12px;padding:8px 20px;font-size:15px;background:#2a2a2a;color:#eee;border:1px solid #444;border-radius:8px;cursor:pointer;}
   @media(max-width:500px){.cell{width:32px;height:32px;font-size:19px;}}
 </style>
 </head>
 <body>
 <h1>📦 推箱子</h1>
-<div id="info">移动: 0</div>
+<div id="info">移动: 0 | 关卡 1 / 20</div>
 <div id="board"></div>
 <p class="hint">方向键 / WASD 移动 · R 重来</p>
+<div class="btn-row">
+  <button onclick="prevLevel()">⬅ 上一关</button>
+  <button onclick="restart()">🔄 重来</button>
+  <button onclick="nextLevel()">下一关 ➡</button>
+  <button onclick="autoSolve()">🤖 自动求解</button>
+</div>
 <div class="touch-pad">
   <button data-act="up">↑</button>
   <button data-act="restart" class="wide">重来</button>
@@ -41,34 +49,210 @@
 <script>
 const LEVELS=[
   [
-    "  #####",
-    "###   #",
-    "#.@$  #",
-    "### $.#",
-    "#.##$ #",
-    "# # . ##",
-    "#   $$ #",
-    "###  ###",
-    "  ####"
-  ],
-  [
     "####",
     "# .#",
     "#  ###",
     "#*@  #",
     "#  $ #",
-    "#  . #",
+    "#  ###",
+    "####"
+  ],
+  [
+    "######",
+    "#    #",
+    "# #@ #",
+    "# $* #",
+    "# .* #",
+    "#    #",
     "######"
+  ],
+  [
+    "  ####",
+    "###  ####",
+    "#     $ #",
+    "# #  #$ #",
+    "# . .#@ #",
+    "#########"
+  ],
+  [
+    "########",
+    "#      #",
+    "# .**$@#",
+    "#      #",
+    "#####  #",
+    "    ####"
+  ],
+  [
+    " #######",
+    " #     #",
+    " # .$. #",
+    "## $@$ #",
+    "#  .$. #",
+    "#      #",
+    "########"
+  ],
+  [
+    "###### #####",
+    "#    ###   #",
+    "# $$     #@#",
+    "# $ #...   #",
+    "#   ########",
+    "#####"
+  ],
+  [
+    "#######",
+    "#     #",
+    "# .$. #",
+    "# $.$ #",
+    "# .$. #",
+    "# $.$ #",
+    "#  @  #",
+    "#######"
+  ],
+  [
+    "  ######",
+    "  # ..@#",
+    "  # $$ #",
+    "  ## ###",
+    "   # #",
+    "   # #",
+    "#### #",
+    "#    ##",
+    "# #   #",
+    "#   # #",
+    "###   #",
+    "  #####"
+  ],
+  [
+    "#####",
+    "#.  ##",
+    "#@$$ #",
+    "##   #",
+    " ##  #",
+    "  ##.#",
+    "   ###"
+  ],
+  [
+    "      #####",
+    "      #.  #",
+    "      #.# #",
+    "#######.# #",
+    "# @ $ $ $ #",
+    "# # # # ###",
+    "#       #",
+    "#########"
+  ],
+  [
+    "  ######",
+    "  #    #",
+    "  # ##@##",
+    "### # $ #",
+    "# ..# $ #",
+    "#       #",
+    "#  ######",
+    "####"
+  ],
+  [
+    "#####",
+    "#   ##",
+    "# $  #",
+    "## $ ####",
+    " ###@.  #",
+    "  #  .# #",
+    "  #     #",
+    "  #######"
+  ],
+  [
+    "####",
+    "#. ##",
+    "#.@ #",
+    "#. $#",
+    "##$ ###",
+    " # $  #",
+    " #    #",
+    " #  ###",
+    " ####"
+  ],
+  [
+    "#######",
+    "#     #",
+    "# # # #",
+    "#. $*@#",
+    "#   ###",
+    "#####"
+  ],
+  [
+    "     ###",
+    "######@##",
+    "#    .* #",
+    "#   #   #",
+    "#####$# #",
+    "    #   #",
+    "    #####"
+  ],
+  [
+    " ####",
+    " #  ####",
+    " #     ##",
+    "## ##   #",
+    "#. .# @$##",
+    "#   # $$ #",
+    "#  .#    #",
+    "##########"
+  ],
+  [
+    "#####",
+    "# @ #",
+    "#...#",
+    "#$$$##",
+    "#    #",
+    "#    #",
+    "######"
+  ],
+  [
+    "#######",
+    "#     #",
+    "#. .  #",
+    "# ## ##",
+    "#  $ #",
+    "###$ #",
+    "  #@ #",
+    "  #  #",
+    "  ####"
+  ],
+  [
+    "########",
+    "#   .. #",
+    "#  @$$ #",
+    "##### ##",
+    "   #  #",
+    "   #  #",
+    "   #  #",
+    "   ####"
+  ],
+  [
+    "#######",
+    "#     ###",
+    "#  @$$..#",
+    "#### ## #",
+    "  #     #",
+    "  #  ####",
+    "  #  #",
+    "  ####"
   ]
 ];
 
 const boardEl=document.getElementById('board');
-let map,player,boxes,goals,moves,level,rows,cols;
+let map,player,boxes,goals,moves,level,rows,cols,finished,winHandled;
+let currentLevel=0;
 
 function loadLevel(idx){
-  const raw=LEVELS[idx%LEVELS.length];
+  currentLevel=((idx%LEVELS.length)+LEVELS.length)%LEVELS.length;
+  level=currentLevel;
+  const raw=LEVELS[currentLevel];
   rows=raw.length;cols=Math.max(...raw.map(r=>r.length));
-  map=[];boxes=[];goals=[];moves=0;
+  map=[];boxes=[];goals=[];moves=0;finished=false;winHandled=false;
+
   for(let y=0;y<rows;y++){
     const row=[];
     for(let x=0;x<cols;x++){
@@ -85,6 +269,18 @@ function loadLevel(idx){
   render();
 }
 
+function prevLevel(){loadLevel(currentLevel-1);}
+function nextLevel(){loadLevel(currentLevel+1);}
+function restart(){loadLevel(currentLevel);}
+
+function inBounds(x,y){
+  return y>=0 && y<rows && x>=0 && x<cols;
+}
+
+function isWall(x,y){
+  return !inBounds(x,y) || map[y][x]==='wall';
+}
+
 function render(){
   boardEl.innerHTML='';
   boardEl.style.gridTemplateColumns=`repeat(${cols},auto)`;
@@ -98,33 +294,142 @@ function render(){
       if(map[y][x]==='goal')d.classList.add('on');
       d.textContent='📦';
     }
-    if(player[0]===x&&player[1]===y)d.classList.add('player'),d.textContent='🙂';
+    if(player[0]===x&&player[1]===y){
+      d.classList.add('player');
+      d.textContent='🙂';
+    }
     boardEl.appendChild(d);
   }
-  document.getElementById('info').textContent='移动: '+moves+' | 关卡 '+(level+1);
+  document.getElementById('info').textContent='移动: '+moves+' | 关卡 '+(currentLevel+1)+' / '+LEVELS.length;
 }
 
 function move(dx,dy){
-  const[nx,ny]=[player[0]+dx,player[1]+dy];
-  if(map[ny]&&map[ny][nx]==='wall')return;
+  if(finished)return;
+  const nx=player[0]+dx, ny=player[1]+dy;
+
+  if(isWall(nx,ny))return;
+
   const bi=boxes.findIndex(b=>b[0]===nx&&b[1]===ny);
   if(bi>=0){
-    const[bx,by]=[nx+dx,ny+dy];
-    if(map[by]&&map[by][bx]==='wall')return;
+    const bx=nx+dx, by=ny+dy;
+    if(isWall(bx,by))return;
     if(boxes.some(b=>b[0]===bx&&b[1]===by))return;
     boxes[bi]=[bx,by];
   }
-  player=[nx,ny];moves++;render();checkWin();
+
+  player=[nx,ny];
+  moves++;
+  render();
+  checkWin();
 }
 
 function checkWin(){
+  if(winHandled)return;
   if(boxes.every(b=>map[b[1]][b[0]]==='goal')){
-    document.getElementById('info').textContent='🎉 过关！按 R 下一关';
-    level++;
+    winHandled=true;
+    finished=true;
+    document.getElementById('info').textContent='🎉 过关！点“下一关”继续，或点“重来”再玩一次';
   }
 }
 
-function restart(){loadLevel(level);}
+// ========== 自动求解 ==========
+
+const MAX_NODES=200000;
+
+function stateKey(p,bs){
+  const sorted=bs.map(b=>b[0]+','+b[1]).sort().join('|');
+  return p[0]+','+p[1]+'#'+sorted;
+}
+
+function cloneBoxes(bs){return bs.map(b=>[b[0],b[1]]);}
+
+function isSolved(bs){
+  return bs.every(b=>map[b[1]][b[0]]==='goal');
+}
+
+function tryMove(p,bs,dx,dy){
+  const nx=p[0]+dx, ny=p[1]+dy;
+  if(isWall(nx,ny))return null;
+  const bi=bs.findIndex(b=>b[0]===nx&&b[1]===ny);
+  let newBoxes=bs;
+  if(bi>=0){
+    const bx=nx+dx, by=ny+dy;
+    if(isWall(bx,by))return null;
+    if(bs.some(b=>b[0]===bx&&b[1]===by))return null;
+    newBoxes=cloneBoxes(bs);
+    newBoxes[bi]=[bx,by];
+  }
+  return {p:[nx,ny],bs:newBoxes,dx,dy};
+}
+
+function autoSolve(){
+  if(finished)return;
+  const startP=[player[0],player[1]];
+  const startB=cloneBoxes(boxes);
+
+  if(isSolved(startB)){alert('已经过关了！');return;}
+
+  const queue=[{p:startP,bs:startB,path:[]}];
+  const visited=new Set([stateKey(startP,startB)]);
+  let nodes=0;
+
+  while(queue.length>0){
+    const cur=queue.shift();
+    nodes++;
+
+    if(nodes>MAX_NODES){
+      alert('这关太复杂，自动求解失败。请手动玩，或按 R 重来。');
+      return;
+    }
+
+    for(const[dx,dy]of[[0,-1],[0,1],[-1,0],[1,0]]){
+      const next=tryMove(cur.p,cur.bs,dx,dy);
+      if(!next)continue;
+
+      const key=stateKey(next.p,next.bs);
+      if(visited.has(key))continue;
+      visited.add(key);
+
+      const newPath=cur.path.concat([{dx,dy}]);
+      if(isSolved(next.bs)){
+        playPath(newPath);
+        return;
+      }
+      queue.push({p:next.p,bs:next.bs,path:newPath});
+    }
+  }
+
+  alert('无解或搜索空间耗尽，自动求解失败。');
+}
+
+function playPath(path){
+  let i=0;
+  finished=true;
+  const timer=setInterval(()=>{
+    if(i>=path.length){
+      clearInterval(timer);
+      finished=false;
+      checkWin();
+      return;
+    }
+    const{dx,dy}=path[i++];
+    const nx=player[0]+dx, ny=player[1]+dy;
+    if(isWall(nx,ny)){clearInterval(timer);finished=false;return;}
+    const bi=boxes.findIndex(b=>b[0]===nx&&b[1]===ny);
+    if(bi>=0){
+      const bx=nx+dx, by=ny+dy;
+      if(isWall(bx,by)||boxes.some(b=>b[0]===bx&&b[1]===by)){
+        clearInterval(timer);finished=false;return;
+      }
+      boxes[bi]=[bx,by];
+    }
+    player=[nx,ny];
+    moves++;
+    render();
+  },120);
+}
+
+// ========== 输入 ==========
 
 document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
@@ -147,7 +452,6 @@ document.querySelector('.touch-pad').addEventListener('click',e=>{
   else if(a==='restart')restart();
 });
 
-level=0;
 loadLevel(0);
 </script>
 </body>

@@ -32,12 +32,13 @@
   <button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button>
   <button data-n="6">6</button><button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button><button data-n="0">清除</button>
 </div>
-<p class="hint">键盘 1-9 填数 · 0/Delete 清除</p>
+<p class="hint">键盘 1-9 填数 · 0/Delete 清除 · 错误数字会变红</p>
 <button class="restart" onclick="init()">换一题</button>
 
 <script>
 const boardEl=document.getElementById('board');
-let puzzle,solution,selected=null;
+let puzzle, solution, given, selected=null;
+let errors=0, startTime=0, timerId=null, finished=false;
 
 const BASE=[
   [5,3,0,0,7,0,0,0,0],
@@ -73,31 +74,61 @@ function valid(g,x,y,n){
   return true;
 }
 
+function fmtTime(sec){
+  const m=String(Math.floor(sec/60)).padStart(2,'0');
+  const s=String(sec%60).padStart(2,'0');
+  return m+':'+s;
+}
+
+function updateInfo(){
+  if(finished)return;
+  const sec=Math.floor((Date.now()-startTime)/1000);
+  document.getElementById('info').textContent='⏱ '+fmtTime(sec)+' | ❌ 错误 '+errors;
+}
+
+function startTimer(){
+  clearInterval(timerId);
+  startTime=Date.now();
+  timerId=setInterval(updateInfo,1000);
+}
+
 function init(){
   solution=JSON.parse(JSON.stringify(BASE));
   solve(solution);
   puzzle=solution.map(r=>r.slice());
+
+  // 记录哪些格子是题目自带的
+  given=Array.from({length:9},()=>new Array(9).fill(false));
+
   let removed=0;
   while(removed<45){
     const x=Math.floor(Math.random()*9),y=Math.floor(Math.random()*9);
     if(puzzle[y][x]!==0){puzzle[y][x]=0;removed++;}
   }
+  // 剩下的非 0 就是 given
+  for(let y=0;y<9;y++)for(let x=0;x<9;x++){
+    if(puzzle[y][x]!==0)given[y][x]=true;
+  }
+
   selected=null;
+  errors=0;finished=false;
   render();
-  document.getElementById('info').textContent='点击格子后选数字';
+  startTimer();
+  updateInfo();
 }
 
 function render(){
   boardEl.innerHTML='';
   for(let y=0;y<9;y++)for(let x=0;x<9;x++){
     const d=document.createElement('div');
-    d.className='cell'+(puzzle[y][x]!==0?' given':'');
+    d.className='cell'+(given[y][x]?' given':'');
     if(y===2||y===5)d.classList.add('row3');
     d.dataset.x=x;d.dataset.y=y;
     d.textContent=puzzle[y][x]||'';
     if(selected&&selected.x===x&&selected.y===y)d.classList.add('selected');
     d.addEventListener('click',()=>{
-      if(puzzle[y][x]!==0)return;
+      // 只有非 given 的格子才能选中
+      if(given[y][x])return;
       selected={x,y};render();
     });
     boardEl.appendChild(d);
@@ -105,14 +136,21 @@ function render(){
 }
 
 function place(n){
-  if(!selected)return;
+  if(finished||!selected)return;
   const{x,y}=selected;
-  if(puzzle[y][x]!==0)return;
+  if(given[y][x])return;
+
+  // 玩家格子：可填、可改、可清除
   puzzle[y][x]=n;
   const el=boardEl.children[y*9+x];
   el.textContent=n||'';
-  el.classList.toggle('error',n!==0&&n!==solution[y][x]);
-  if(n===0)el.classList.remove('error');
+  el.classList.remove('error');
+
+  if(n!==0 && n!==solution[y][x]){
+    el.classList.add('error');
+    errors++;
+    updateInfo();
+  }
   checkWin();
 }
 
@@ -120,7 +158,10 @@ function checkWin(){
   for(let y=0;y<9;y++)for(let x=0;x<9;x++){
     if(puzzle[y][x]!==solution[y][x])return;
   }
-  document.getElementById('info').textContent='🎉 完成！';
+  finished=true;
+  clearInterval(timerId);
+  const sec=Math.floor((Date.now()-startTime)/1000);
+  document.getElementById('info').textContent='🎉 完成！用时 '+fmtTime(sec)+'，错误 '+errors+' 次';
 }
 
 document.addEventListener('keydown',e=>{
