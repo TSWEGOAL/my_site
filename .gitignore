@@ -23,6 +23,9 @@ instance/
 # 测试缓存
 .pytest_cache/
 
+# pytest-html 测试报告（本地生成，不进仓库）
+report.html
+
 # IDE
 .vscode/
 .idea/

@@ -453,3 +453,75 @@ class TestBootstrap:
         with app.app_context():
             ensure_db()
             assert Admin.query.count() == before  # 不会冒出新账号
+
+
+# ============================================================
+# 9. TestViewsStats —— 浏览计数与数据接口（2026-09 新增功能）
+# ============================================================
+class TestViewsStats:
+
+    def test_views_increment_on_detail(self, client):
+        """每访问一次详情页，浏览量 +1，且详情页把数字渲染出来。"""
+        pid = make_post(title='计数文')
+        for expected in (1, 2, 3):
+            client.get(f'/blog/{pid}')
+            with app.app_context():
+                p = db.session.get(Post, pid)
+                assert p.views == expected
+        assert '3' in client.get(f'/blog/{pid}').get_data(as_text=True)
+
+    def test_views_shown_on_detail_page(self, client):
+        """详情页 meta 区渲染浏览量标记。"""
+        pid = make_post(title='显示文')
+        body = client.get(f'/blog/{pid}').get_data(as_text=True)
+        assert 'views' in body  # class 标记存在
+
+    def test_stats_requires_login(self, client):
+        """未登录访问 /admin/stats → 302 拦截（数据接口不对外开放）。"""
+        r = client.get('/admin/stats')
+        assert r.status_code == 302
+        assert r.headers['Location'].startswith('/admin/login?next=')
+
+    def test_stats_payload(self, admin_client):
+        """登录后 stats 返回完整 JSON：六项聚合数据都对得上。"""
+        make_post(title='统计A', tag=',统计,')
+        make_post(title='统计B', tag=',统计,')
+        r = admin_client.get('/admin/stats')
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data['total_posts'] == 2
+        assert data['total_views'] >= 0
+        assert set(data.keys()) >= {'total_posts', 'total_views',
+                                    'top_posts', 'tags',
+                                    'latest_post', 'games_count'}
+        assert data['tags'] == {'统计': 2}
+        assert len(data['top_posts']) == 2
+        assert data['top_posts'][0]['views'] >= data['top_posts'][1]['views']
+        assert data['games_count'] >= 6  # 至少原有 6 个游戏
+
+    def test_old_db_migration_adds_views(self):
+        """【迁移回归】旧库没有 views 列时，ensure_db 自动补列且保留旧数据。
+
+        对应线上 Neon：部署新代码后第一次启动就要走这条路。
+        """
+        from sqlalchemy import inspect as sa_inspect
+        with app.app_context():
+            # 模拟旧表：删表后手工建一个没有 views 列的结构
+            db.drop_all()
+            db.session.execute(db.text(
+                "CREATE TABLE post (id INTEGER PRIMARY KEY, "
+                "title VARCHAR(200) NOT NULL, content TEXT NOT NULL, "
+                "tag VARCHAR(200) DEFAULT '' NOT NULL, created_at DATETIME)"))
+            db.session.execute(db.text(
+                "INSERT INTO post (title, content, tag) "
+                "VALUES ('旧文章', 'c', '')"))
+            db.session.commit()
+
+            ensure_db()  # 迁移应该在这里补列
+
+            cols = {c['name'] for c in sa_inspect(db.engine)
+                    .get_columns('post')}
+            assert 'views' in cols                 # 列已补上
+            p = Post.query.filter_by(title='旧文章').first()
+            assert p is not None                   # 旧数据没丢
+            assert (p.views or 0) == 0             # 默认值 0

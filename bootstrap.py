@@ -46,6 +46,26 @@ ABOUT_SEED_MD = """\
 """
 
 
+def _migrate_missing_columns(log):
+    """给已存在的表补缺失的列（SQLite / PostgreSQL 通用）。
+
+    目前只有一处迁移：post.views（浏览量，2026-09 加的）。
+    以后再加字段，往 REQUIRED_COLUMNS 里登记即可。
+    """
+    required = {
+        'post': {'views': 'INTEGER NOT NULL DEFAULT 0'},
+    }
+    for table, cols in required.items():
+        existing = {c['name'] for c in inspect(db.engine)
+                    .get_columns(table)}
+        for col, ddl in cols.items():
+            if col not in existing:
+                db.session.execute(
+                    db.text(f'ALTER TABLE {table} ADD COLUMN {col} {ddl}'))
+                db.session.commit()
+                log(f'已迁移：{table} 表新增 {col} 列')
+
+
 def ensure_db(verbose=False):
     """幂等自举。必须在 Flask app context 内调用。
 
@@ -55,6 +75,12 @@ def ensure_db(verbose=False):
 
     db.create_all()
     log('数据库中的表：', inspect(db.engine).get_table_names())
+
+    # ===== 轻量迁移：给旧库补缺失的列 =====
+    # db.create_all() 只建新表，不会给已存在的表加新列。
+    # SQLite 和 PostgreSQL 都支持 ALTER TABLE ... ADD COLUMN。
+    # 幂等：列已存在时跳过（inspect 探测列名）。
+    _migrate_missing_columns(log)
 
     # ===== 站点页面种子 =====
     if not Page.query.filter_by(slug='about').first():

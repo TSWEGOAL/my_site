@@ -5,13 +5,14 @@ from urllib.parse import urlparse
 from collections import Counter
 
 from flask import (Flask, render_template, redirect, url_for, request,
-                   session, flash, abort, send_from_directory)
+                   session, flash, abort, send_from_directory, jsonify)
 from dotenv import load_dotenv
 from markupsafe import Markup
 
 from extensions import (db, csrf, limiter, admin_required,
                        render_markdown)
 from blueprints.games import games_bp
+from blueprints.games import load_games
 from blueprints.blog import blog_bp
 from models import Admin, Post, Page
 from bootstrap import ensure_db, ABOUT_SEED_MD
@@ -127,6 +128,37 @@ def admin_edit_about():
 
 
 # About 页种子统一放在 bootstrap.py（ABOUT_SEED_MD），init_db 与运行时共用一份
+
+
+# ---------- 管理员：站点数据接口 ----------
+@app.route('/admin/stats')
+@admin_required
+def admin_stats():
+    """站点数据聚合接口（给数据分析 agent / 脚本用的 JSON 源）。
+
+    需要管理员登录才能访问——数据虽不敏感，但也没必要公开给爬虫。
+    """
+    posts = Post.query.order_by(Post.created_at.desc()).all()
+
+    tag_counter = Counter()
+    for p in posts:
+        for t in p.tags:
+            tag_counter[t] += 1
+
+    return jsonify({
+        'total_posts': len(posts),
+        'total_views': sum(p.views or 0 for p in posts),
+        'top_posts': [
+            {'id': p.id, 'title': p.title, 'views': p.views or 0,
+             'created_at': p.created_at.strftime('%Y-%m-%d')}
+            for p in sorted(posts, key=lambda x: x.views or 0,
+                            reverse=True)[:5]
+        ],
+        'tags': dict(tag_counter.most_common()),
+        'latest_post': (posts[0].created_at.strftime('%Y-%m-%d')
+                        if posts else None),
+        'games_count': len(load_games()),
+    })
 
 
 # ---------- 管理员登录/登出 ----------

@@ -67,6 +67,12 @@ def tag_filter(tag):
 @blog_bp.route('/<int:post_id>')
 def post_detail(post_id):
     post = Post.query.get_or_404(post_id)
+    # 浏览计数 +1（原子自增，避免并发时互相覆盖）
+    db.session.execute(db.update(Post)
+                       .where(Post.id == post_id)
+                       .values(views=Post.views + 1))
+    db.session.commit()
+    db.session.refresh(post)  # 拿到自增后的新值再渲染
     return render_template('blog/detail.html', post=post)
 
 

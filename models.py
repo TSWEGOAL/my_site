@@ -25,6 +25,8 @@ class Post(db.Model):
     tag = db.Column(db.String(200), default='', nullable=False)
     created_at = db.Column(db.DateTime,
                            default=lambda: datetime.now(timezone.utc))
+    # 浏览量（详情页每次访问 +1）。旧库没有这一列时由 bootstrap 迁移补上
+    views = db.Column(db.Integer, nullable=False, server_default='0')
 
     @property
     def tags(self):
