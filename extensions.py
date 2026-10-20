@@ -30,7 +30,9 @@ def admin_required(f):
 # mistune 是可选依赖：装了走真 Markdown，没装退化为纯文本段落。
 try:
     import mistune
-    _markdown = mistune.create_markdown()
+    # mistune 3 默认只开核心语法，表格/删除线要靠插件显式打开。
+    # 不开 table 的话，Markdown 表格会原样显示成一堆竖线。
+    _markdown = mistune.create_markdown(plugins=['table', 'strikethrough'])
 except ImportError:
     _markdown = None
 
