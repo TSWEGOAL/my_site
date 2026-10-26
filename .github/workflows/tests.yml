@@ -1,0 +1,44 @@
+name: tests
+
+# 什么时候跑：
+#   - 推送到 main
+#   - 往 main 提 PR
+#   - 在 Actions 页面手动点「Run workflow」（调试用）
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一个分支连续推送时，取消上一次还没跑完的任务，省额度也省等待
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 拉代码
+        uses: actions/checkout@v4
+
+      - name: 装 Python
+        uses: actions/setup-python@v5
+        with:
+          # 和 Render 上实际使用的大版本保持一致，避免「本地过、线上炸」
+          python-version: '3.14'
+          cache: pip
+
+      - name: 装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: 跑测试
+        # test_site.py 自己会把 DATABASE_URL 指向临时 SQLite，
+        # 不需要在这里配任何密钥或数据库连接串
+        run: python -m pytest test_site.py -v --color=yes

@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-my_site 全站 pytest 测试套件（单文件版，~39 条）
+my_site 全站 pytest 测试套件（单文件版，48 条）
 
 【运行方式】（在项目根目录 D:\\codes\\my_site 下）
     python -m pip install pytest        # 只需要装一次
     python -m pytest test_site.py -v    # -v 显示每条测试名
+
+【CI】推送到 main 时 GitHub Actions 会自动跑一遍（见 .github/workflows/tests.yml），
+      跑挂了在 GitHub 上能看到红叉，不会自动拦下部署（Render 照常部署）。
 
 【安全保证】
     测试开始前会把 DATABASE_URL 指到一个临时目录里的全新 SQLite 文件，
@@ -14,13 +17,15 @@ my_site 全站 pytest 测试套件（单文件版，~39 条）
 【结构】
     1. 文件顶部：环境准备（必须在 import app 之前完成）
     2. fixtures：fresh_db / client / admin_client
-    3. 六组测试类：
-       TestRoutes     公开路由冒烟
-       TestAuth       登录/登出/限流/CSRF
-       TestSecurity   安全防护生效性验证
-       TestBlog       博客 CRUD + 标签（含坑 2 的大小写回归）
-       TestAbout      About 页与后台编辑
-       TestBootstrap  ensure_db 幂等（含坑 5 的账号漂移回归）
+    3. 测试类分组：
+       TestRoutes           公开路由冒烟
+       TestAuth             登录/登出/限流/CSRF
+       TestSecurity         安全防护生效性验证
+       TestBlog             博客 CRUD + 标签（含坑 2 的大小写回归）
+       TestAbout            About 页与后台编辑
+       TestBootstrap        ensure_db 幂等（含坑 5 的账号漂移回归）
+       TestViewsStats       浏览计数 / 数据接口 / views 列迁移
+       TestContentRendering 健康检查、Markdown 渲染、404 跳出 iframe
 """
 import os
 import sys
@@ -497,7 +502,7 @@ class TestViewsStats:
         assert data['tags'] == {'统计': 2}
         assert len(data['top_posts']) == 2
         assert data['top_posts'][0]['views'] >= data['top_posts'][1]['views']
-        assert data['games_count'] >= 6  # 至少原有 6 个游戏
+        assert data['games_count'] == 10  # games.json 里的游戏数，加游戏时同步改这里
 
     def test_old_db_migration_adds_views(self):
         """【迁移回归】旧库没有 views 列时，ensure_db 自动补列且保留旧数据。
@@ -525,3 +530,54 @@ class TestViewsStats:
             p = Post.query.filter_by(title='旧文章').first()
             assert p is not None                   # 旧数据没丢
             assert (p.views or 0) == 0             # 默认值 0
+
+
+# ============================================================
+# 10. TestContentRendering —— 健康检查 / Markdown 渲染 / 404
+# ============================================================
+class TestContentRendering:
+
+    def test_healthz_ok(self, client):
+        """/healthz 必须永远返回 200 + ok（它不查库，平台靠它判断服务活着）。"""
+        r = client.get('/healthz')
+        assert r.status_code == 200
+        assert r.get_data(as_text=True).strip() == 'ok'
+
+    def test_markdown_table(self, client):
+        """【回归】mistune 没开 table 插件时，表格会退化成一排竖线。"""
+        md = '| 方案 | 费用 |\n|---|---|\n| Neon | $0 |'
+        pid = make_post(title='表格文', content=md)
+        body = client.get(f'/blog/{pid}').get_data(as_text=True)
+        assert '<table>' in body
+        assert '<th>方案</th>' in body
+
+    def test_markdown_code_block(self, client):
+        """围栏代码块要变成 <pre><code class="language-python">，不能被转义成纯文本。"""
+        md = '```python\nprint(1)\n```'
+        pid = make_post(title='代码文', content=md)
+        body = client.get(f'/blog/{pid}').get_data(as_text=True)
+        assert '<pre>' in body
+        assert 'language-python' in body
+
+    def test_404_page_escapes_iframe(self, client):
+        """【回归】404 页要能跳出 iframe，否则游戏页挂了就退不回站内。"""
+        r = client.get('/no-such-page')
+        assert r.status_code == 404
+        body = r.get_data(as_text=True)
+        assert 'target="_top"' in body
+        assert 'window.top' in body
+
+
+# ============================================================
+# 附：加新测试的套路（三步）
+# ============================================================
+# 1) 要数据：用 make_post() 直接塞库，别顺着 HTTP 一层层建——慢，而且第一步挂了后面全挂
+# 2) 要身份：client = 未登录访客；admin_client = 已登录管理员
+# 3) 断言：先断状态码，再断页面里的文字 / 库里的值
+#
+# 例：
+#     def test_删文章后列表消失(self, admin_client):
+#         pid = make_post(title='待删')
+#         admin_client.post(f'/blog/admin/delete/{pid}')
+#         assert '待删' not in admin_client.get('/blog/').get_data(as_text=True)
+
